@@ -1,0 +1,318 @@
+## factorial MANOVA
+
+## load packages required
+library(curl)       # NOT REQUIRED IF DF IN FILES PANE
+library(ggplot2)    # used for plots
+library(MASS)       # used for Manova() function
+library(heplots)    # used for effect size calculation & plotting
+library(car)        # used for heplots & Manova tests
+library(reshape2)   # used to melt df
+library(pastecs)    # used for descriptive statistics (stat.desc)
+library(MVN)        # used for descriptive statistics
+library(dplyr)      # used to join
+library(colorspace) # used for color palettes
+library(sjstats)    # used for effect size calculation
+
+# YOU: Download your mock dataset from Drop Box on Sakai, then upload to
+# the "Home" folder of your cloud-based RStudio account via the "Upload"
+# button in the "Files" tab in the bottom-right pane.
+
+# load csv dataset and create new dataframe named 'df' with its contents
+# df <- read_csv(filename.csv) # YOU: Replace 'filename.csv' with your file name.
+
+# import file as dataframe 'df' ----
+
+df <- read.csv(curl("https://sites.google.com/a/pepperdine.edu/dleigh/home/quant-methods/demos/soils_df.csv")) # test; delete
+ocdData <- read.delim(curl("https://studysites.sagepub.com/dsur/study/DSUR%20Data%20Files/Chapter%2016/OCD.dat")) # test; delete
+keeps <- c("pH", "Dens", "Conduc", "Contour", "Depth") # test; delete
+df <- df[keeps] # test; delete
+attach(df) # allow objects in dataset to be accessed w/o dataset$variable
+
+# prepare dataset for analysis ----
+
+# below unnecessary as R's smart
+# options(scipen = 999)
+# Contour <- factor(Contour)
+# Contour
+# Depth <- factor(Depth)
+# Depth
+sapply(df, class) # variable names and class
+  # YOU: replace 'o1' and 'o2' with the names of your first and second outcome
+  # variables (see Console output below), and 'p1' and 'p2' with the names of
+  # your first and second predictor variables. If you have more than two outcomes
+  # create additional lines for each before 'y', iterating 'y2' to 'y3' then 
+  # typing it's name after '<-'. Repeat this process if you have more than two 
+  # predictors (prior to 'x'). If you have only one predictor, comment out 
+  # 'x2 <- p2' with a pound sign (i.e., hashtag).
+
+y1 <- o1 
+y2 <- o2
+y <- cbind(y1, y2) # YOU: if more than two outcomes, add ', y3' etc
+x1 <- p1
+x2 <- p2
+x <- cbind(x1, x2) # YOU: if more than two predictors, add ', x3' etc
+
+y1 <- pH # test; delete
+y2 <- Dens # test; delete
+y3 <- Conduc # test; delete
+y <- cbind(y1, y2, y3) # test; delete
+# x1 <- as.matrix(Contour) # test; delete
+# x2 <- as.matrix(Depth) # test; delete
+x1 <- Contour  # test; delete
+x2 <- Depth  # test; delete
+x <- tibble(x1, x2)  # test; delete
+
+# descriptive statistics ----
+
+summary(df)
+sapply(df, class) # variable names and class
+# scatterplot grid of outcome by all combinations of predictors
+  # YOU: must replace 'p1' and 'p2' long factor names (not x1, x2) (see names in Console)
+  # YOU: if more than two outcomes, add after 'y2'
+scatter_p <- ggplot(df, aes(y1, y2)) + facet_wrap(~p1*p2)
+scatter_p + geom_point() + geom_smooth(method = "lm") + 
+  labs(x = "Predictor", y = "Outcome")
+
+  # three outcomes, two predictors; test; delete
+scatter_p <- ggplot(df, aes(y1, y2, y3)) + facet_wrap(~Contour*Depth)      # test; delete
+scatter_p + geom_point() + geom_smooth(method = "lm") +       # test; delete
+  labs(x = "Predictor", y = "Outcome")      # test; delete
+
+# bar charts
+
+# ocdMelt<-melt(ocdData, id = c("Group"), measured = c("Actions", "Thoughts"))
+# names(ocdMelt)<-c("Group", "Outcome_Measure", "Frequency")
+
+  # must use 'df' and variable names to melt; replace all 'p1' and 'p2' long names
+melted <- melt(df, id = cbind("p1", "p2"), measured = y)
+names(melted) <- c("p1", "p2", "Outcome_Measure", "Value")
+
+melted <- melt(df, id = cbind("Contour", "Depth"), measured = y)  # test; delete
+names(melted) <- c("Contour", "Depth", "Outcome_Measure", "Value")  # test; delete
+
+  # If the numeric range of values varies widely across variables, transform
+  # the y-axis of any plot by appending + scale_y_continuous(trans='log10')
+  # after any/all instances of '"Outcome Measure")' below. For more information
+  # see https://youtu.be/5571wc0iWCI
+
+  # replace 'p1' with long name of 1st predictor; no need to touch second code chunk
+my.plots <- ggplot(melted, aes(p1, Value, fill = Outcome_Measure))
+my.plots <- ggplot(melted, aes(Contour, Value, fill = Outcome_Measure))  # test; delete
+
+my.plots + stat_summary(fun.y = mean, geom = "bar", position = "dodge") + 
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", 
+               position=position_dodge(width=0.90), width = 0.2) + 
+  labs(x = "Predictor", y = "Value", fill = "Outcome Measure") 
+
+  # YOU: If your dataset has more than one predictor, copy and paste all code
+  # above beginning with 'my.plots', iterating name to 'my.plots2' etc, and
+  # replacing 'p1' with the full name of your second predictor.
+
+my.plots2 <- ggplot(melted, aes(Depth, Value, fill = Outcome_Measure))  # test; delete
+
+my.plots2 + stat_summary(fun.y = mean, geom = "bar", position = "dodge") +   # test; delete
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar",   # test; delete
+               position=position_dodge(width=0.90), width = 0.2) +   # test; delete
+  labs(x = "Predictor", y = "Value", fill = "Outcome Measure")   # test; delete
+
+# boxplots
+# box_p1 <- ggplot(melted, aes(Contour, Value, color = Outcome_Measure))
+my.plots + geom_boxplot() + labs(x = "Predictor", y = "Value", 
+                               color = "Outcome Measure") 
+  # YOU: If you dataset has more than one predictor, copy/pates the code above,
+  # iterating 'my.plots' to 'my.plots2' etc.
+
+# box_p2 <- ggplot(melted, aes(Depth, Value, color = Outcome_Measure))
+my.plots2 + geom_boxplot() + labs(x = "Predictor", y = "Value",    # test; delete
+                               color = "Outcome Measure")    # test; delete
+
+
+
+# descrptive statistics
+# options(digits = 2)
+# by(y1, x1, stat.desc, basic = FALSE)
+# library(dplyr)
+# test.y <- select(df, (names(df)[sapply(df, class) != "factor"])) # select not-factors in df
+# test.y.names <- (names(df)[sapply(df, class) != "factor"]) # y names
+# test.x <- select(df, (names(df)[sapply(df, class) == "factor"])) # select factors in df
+# test.x.names <- (names(df)[sapply(df, class) == "factor"]) # x names
+# 
+# df.tests <- as.data.frame(cbind(test.y,test.x))
+# # test <-  !!!names(df)[sapply(df, class) != "factor"]
+# # df.tests <- as.data.frame(cbind(ys,xs))
+# 
+# df.minus.x2 <- within(df, rm(cat(test.x.names[2])))
+# df.test <- subset(df, select = -c(cat(test.x.names[2])))
+
+# tests of statistical assumptions ----
+
+  # YOU: It's necessary to create separate objects for each predictor variable
+  # in order to print descriptive statistics and run assumption tests using
+  # the 'MVN' package. If your dataset contains multiple predictors, you must
+  # temporarily exlude all but one predictors from the 'data' argument and also
+  # 'subset' just the one remaining predictor for analysis. So, if the output
+  # from 'sapply' below indicates that you have, for example, five variables
+  # with the outcomes in columns 1, 2 and 3, and two predictors in columns 4
+  # and 5, then the 'data' argument should be set to 'df[-5]' to exclude your
+  # first predictor and the 'subset' argument should be set to include only
+  # column 4 via 'colnames(df[4])'. Adjust these values in the cope below to
+  # suit your dataset, then copy/paste the four lines of code below, iterating
+  # 'x1.tests' to 'x2.tests' etc, and changing 'data = df[-5]' to 
+  # data = df[-4] and colnames(df[5]) and so forth. If you have three or more
+  # predictors, exclude them via the format 'df[-a, -b]' where 'a' and 'b' (etc)
+  # are the comma-separated column numbers to exclude.
+sapply(df, class) # variable names and class
+
+x1.tests <- mvn(data = df[-5], subset = colnames(df[4]), mvnTest = "mardia",
+                univariateTest = "SW", univariatePlot = "histogram",
+                multivariatePlot = "qq", multivariateOutlierMethod = "adj",
+                showOutliers = TRUE, showNewData = TRUE)
+
+
+x1.tests <- mvn(data = df[-5], subset = colnames(df[4]), mvnTest = "mardia",# test; delete
+                univariateTest = "SW", univariatePlot = "histogram",# test; delete
+                multivariatePlot = "qq", multivariateOutlierMethod = "adj",# test; delete
+                showOutliers = TRUE, showNewData = TRUE)# test; delete
+  # in addition to saving multiple analyses to the object 'x1.tests', the
+  # command above also prints Q-Q plots for each outcome, adjusted Q-Q plots
+  # for any outcomes with outliers, and histograms for each outcome.
+
+# descriptive stats for each outcome grouped by x1
+x1.tests$Descriptives
+
+# univariate normality tests for each outcome grouped by x1
+x1.tests$univariateNormality
+
+# multivariate normality tests for each outcome grouped by x1
+x1.tests$multivariateNormality
+
+# prints outliers by case (row) number for each outcome grouped by x1
+x1.tests$multivariateOutliers
+
+# save new x1 data without outliers; uncomment to run # test; delete
+# new.x1.df <- do.call(rbind.data.frame, x1.tests$newData) # test; delete
+
+  # YOU: If your dataset contains more than one predictor, copy/paste the code
+  # beginning 'x1.tests' above as many times as necessary to cover all your
+  # predictors, iterating 'x1' to 'x2' etc, and changing the bracketed numbers
+  # in 'x1.tests <- mvn' as described in the comment above.
+
+# check assumption of homogeneity of covariances
+# plots ordered according to the sizes of the data ellipses from covEllipses()
+
+# YOU: If multiple predictors, copy/paste, changing 'x1' to 'x2' etc
+covEllipses(y, x1, fill=TRUE, pooled=FALSE, 
+            col = diverging_hcl(2), variables=1:ncol(y))
+  # ellipses should stack, be of similar sizes, w/ groups in same order
+
+covEllipses(y, x2, fill=TRUE, pooled=FALSE, # test; delete
+            col = diverging_hcl(2), variables=1:ncol(y)) # test; delete
+
+# Box's M-test for homogeneity of covariance matrices
+  # YOU: If your dataset has multiple predictors, copy/paste ... iterating ...
+x1.boxm <- boxM(y, x1)
+x1.boxm
+  # p-value of Box's M-test should be GREATER than 0.001
+plot(x1.boxm, cex.lab=1.5)
+  # whiskers should overlap (95% CI)
+
+# op <- par(mar=c(4,6,1,1)+.5) # test; delete
+# plot(Depth.boxm, cex.lab=1.5) # test; delete
+  # whiskers should overlap (95% CI)
+# par(mai=c(0,0,0,0)) # resets plot window to defaults for future plots # test; delete
+
+# # for Contour ...
+# covEllipses(y, Contour, fill=TRUE, pooled=FALSE,  # test; delete
+#             col=c("blue", "green", "orange"), variables=1:3)
+# Contour.boxm <- boxM(y, Contour) # test; delete
+# Contour.boxm # test; delete
+# op <- par(mar=c(4,6,1,1)+.5) # test; delete
+# plot(Contour.boxm, cex.lab=1.5) # test; delete
+
+# execute factorial MANOVA model ----
+
+  # YOU: If your dataset has only one predictor, remove each 'x2' as well as
+  # the '+' and '*' operators before them. If your dataset contains more than
+  # two predictord, iterate 'x2' to 'x3' etc and join with additional '+' 
+  # and '*' operators.
+lm.model <- lm(y ~ x1 + x2 + x1*x2 -1)
+man.model <- manova(lm.model)
+  # the '-1' at end of line removes intercept from model
+  # for more information, see https://stats.stackexchange.com/a/32518
+
+lm.model <- lm(y ~ x1 + x2 + x1*x2 -1)  # test; delete
+man.model <- manova(lm.model)  # test; delete
+
+# # visually check assumption of multivariate normality via chi-square Q-Q plot  # test; delete
+# cqplot(man.model)  # test; delete
+#   # points should lie close to line  # test; delete
+
+# print factorial MANOVA model
+summary(man.model)
+
+  # YOU: The results of 'man.model' indicate which, if any, or your predictors
+  # are statistically significant predictors of your outcomes, followed by
+  # whether the interaction(s) between the predictors are statsig. If the
+  # interactions are statsig, then run the Type III sum of squares MANOVAs 
+  # below to check that this result holds across the other three statistical
+  # test methods (Wilks, Hotelling-Lawley and Roy). If the result above is not
+  # statsig, then run the Type II sum of squares MANOVAs for the same purpose.
+
+# Type III sum of squares MANOVAs for statsig interactions
+  # YOU: comment out the below three lines if your interactions ARE NOT statsig.
+Manova(lm.model, type=c("III"), test=("Wilks"))
+Manova(lm.model, type=c("III"), test=("Hotelling-Lawley"))
+Manova(lm.model, type=c("III"), test=("Roy"))
+
+# Type II factorial MANOVAs for non-statsig interactions
+  # YOU: comment out the below three lines if your interactions ARE statsig.
+Manova(lm.model, type=c("II"), test=("Wilks"))
+Manova(lm.model, type=c("II"), test=("Hotelling-Lawley"))
+Manova(lm.model, type=c("II"), test=("Roy"))
+
+  # YOU: If 'man.model' indicated that statsig interactions exist, and this was
+  # confirmed by the Type III sum of squares MANOVAs, then the following 
+  # commands show which of the bivariate pairs of interactions are statig. If 
+  # the 'man.model' does not indicate that any statsign interactions exist, 
+  # and this was confirmed by the Type II factorial MANOVAs, then the results
+  # that would be output below are not dependabe, so comment out the bivariate
+  # tests of statistically significant interactions.
+
+# bivariate tests of statistically significant interactions
+summary(lm.model)
+
+# library(phia) # test; delete
+# testInteractions(lm.model, pairwise = c("x1", "x2")) # test; delete
+# testInteractions(lm.model, pairwise="x1") # test; delete
+# testInteractions(lm.model, pairwise="x2") # test; delete
+
+# matrix of HE plots for all pairs of response variables
+  # YOU: Adjust the names and numbers of the predictor variables in
+  # 'terms' below and/or predictor varaibles in 'variables' below
+  # to reflect the name and number of variables in your dataset.
+# two-dimensional H(ypothesis) E(rror) plots of predictors on outcomes
+# plots ellipsoids in 2D representing the hypothesis and error 
+# sums-of-squares-and-products matrices for terms and linear 
+# hypotheses in a multivariate linear model
+pairs(man.model, terms=c("x1", "x2"), variables=c("y1", "y2", "y3"))
+# blue ellipses should extend beyond red dashed-circle
+# given effect is significant if and only if the H ellipse 
+# projects anywhere outside the E ellipse
+# points show mean differences, ellipses the error of point estimate
+# illustrates ordering of means (closest to centroid outward)
+
+# calculation of obtained effect size ----
+
+# partial (eta-squared) association reflects the additional proportion of
+# variance associated with a given term in the full model that includes it,
+# relative to the reduced model that excludes it; analogous to partial 
+# R-squared in univariate regression models
+etasq(man.model)
+etasq(Anova(man.model), anova=TRUE)   # detailed results
+etasq(man.model, test="Wilks")        # Wilk's eta-squared
+etasq(man.model, test="Hotelling")    # Hotelling eta-squared
+
+# heplot(man.model, variables=c("y1", "y2")) # test; delete
+# heplot(man.model, variables=c("y2", "y3")) # test; delete
+# heplot(man.model, variables=c("y3", "y1")) # test; delete
+
